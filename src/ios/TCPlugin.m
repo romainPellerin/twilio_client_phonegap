@@ -165,8 +165,9 @@
             break;        
     }
     
-    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:state];    
-    [self performSelectorOnMainThread:@selector(writeJavascript:) withObject:[result toSuccessCallbackString:command.callbackId] waitUntilDone:NO];
+    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:state];
+    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+
 }
 
 
@@ -198,34 +199,35 @@
 
 -(void)connectionStatus:(CDVInvokedUrlCommand*)command {
     NSString *state;
-    
+
     switch ([self.connection state]) {
         case TCConnectionStateConnected:
             state = @"open";
             break;
-            
+
         case TCConnectionStateConnecting:
             state = @"connecting";
             break;
-            
+
         case TCConnectionStatePending:
             state = @"pending";
             break;
-            
+
         case TCConnectionStateDisconnected:
             state = @"closed";
-        
+
         default:
-            break;        
+            break;
     }
-        
-    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:state];    
-    [self performSelectorOnMainThread:@selector(writeJavascript:) withObject:[result toSuccessCallbackString:command.callbackId] waitUntilDone:NO];
+
+    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:state];
+    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+
 }
 
 -(void)connectionParameters:(CDVInvokedUrlCommand*)command {
     CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:[self.connection parameters]];
-    [self performSelectorOnMainThread:@selector(writeJavascript:) withObject:[result toSuccessCallbackString:command.callbackId] waitUntilDone:NO];
+    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
 }
 
 
@@ -236,9 +238,9 @@
     @catch(NSException *exception) {
         NSLog(@"Couldn't Cancel Notification");
     }
-    
+
     NSString *alertBody = [command.arguments objectAtIndex:0];
-    
+
     NSString *ringSound = @"incoming.wav";
     if([command.arguments count] == 2) {
         ringSound = [command.arguments objectAtIndex:1];
@@ -259,22 +261,17 @@
 
 -(void)setSpeaker:(CDVInvokedUrlCommand*)command {
     NSString *mode = [command.arguments objectAtIndex:0];
-    if([mode isEqual: @"on"]) {
-        UInt32 audioRouteOverride = kAudioSessionOverrideAudioRoute_Speaker;
-        AudioSessionSetProperty (
-            kAudioSessionProperty_OverrideAudioRoute,
-            sizeof (audioRouteOverride),
-            &audioRouteOverride
-        );
-    }
-    else {
-        UInt32 audioRouteOverride = kAudioSessionOverrideAudioRoute_None;
-        AudioSessionSetProperty (
-            kAudioSessionProperty_OverrideAudioRoute,
-            sizeof (audioRouteOverride),
-            &audioRouteOverride
-        );
-    }
+    AVAudioSession* session = [AVAudioSession sharedInstance];
+    NSError* error;
+
+    [session setCategory:AVAudioSessionCategoryPlayAndRecord error:&error];
+    [session setMode:AVAudioSessionModeVoiceChat error:&error];
+    [session setActive:YES error:&error];
+
+    if([mode isEqual: @"on"])
+        [session overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
+    else
+        [session overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:&error];
 }
 
 # pragma mark private methods
@@ -283,8 +280,9 @@
     NSDictionary *options   = [NSDictionary dictionaryWithObjectsAndKeys:event, @"callback", arguments, @"arguments", nil];
     CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:options];
     result.keepCallback     = [NSNumber numberWithBool:YES];
-    
-    [self performSelectorOnMainThread:@selector(writeJavascript:) withObject:[result toSuccessCallbackString:self.callback] waitUntilDone:NO];
+
+    [self.commandDelegate sendPluginResult:result callbackId:self.callback];
+
 }
 
 -(void)javascriptCallback:(NSString *)event {
@@ -295,8 +293,8 @@
     NSDictionary *object    = [NSDictionary dictionaryWithObjectsAndKeys:[error localizedDescription], @"message", nil];
     CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:object];
     result.keepCallback     = [NSNumber numberWithBool:YES];
-    
-    [self performSelectorOnMainThread:@selector(writeJavascript:) withObject:[result toErrorCallbackString:self.callback] waitUntilDone:NO];
+
+    [self.commandDelegate sendPluginResult:result callbackId:self.callback];
 }
 
 @end
